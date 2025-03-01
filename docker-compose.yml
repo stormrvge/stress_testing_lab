@@ -1,0 +1,151 @@
+services:
+  # Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "localhost", "2181"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - factory-network
+
+  kafka:
+    image: confluentinc/cp-kafka:6.2.4
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    ports:
+      - 29092:29092
+      - 9092:9092
+    healthcheck:
+      test: ["CMD", "nc", "-vz", "localhost", "9092"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    networks:
+      - factory-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui
+    container_name: kafka-ui
+    ports:
+      - "8070:8080"
+    restart: always
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    networks:
+      - factory-network
+
+  kafka-topics-generator:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      "
+      # blocks until kafka is reachable
+      kafka-topics --bootstrap-server kafka:9092 --list
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic tasks-summary --replication-factor 1 --partitions 2
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:9092 --list
+      "
+    networks:
+      - factory-network
+
+  # Databases
+  factory-db:
+    image: postgres:14.5
+    environment:
+      POSTGRES_DB: "factory-service"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - factory-network
+
+  kafka-consumer-db:
+    image: mongo:6.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: kafka_consumer
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - factory-network
+
+  # Applications
+  factory-service:
+    build:
+      context: ./factory-service
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://factory-db:5432/factory-service
+    networks:
+      - factory-network
+    depends_on:
+      factory-db:
+        condition: service_healthy
+    volumes:
+      - temp-data:/var/temp_dir
+
+  kafka-producer:
+    build: ./kafka-producer
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: 'kafka:9092'
+    networks:
+      - factory-network
+    depends_on:
+      - kafka
+    volumes:
+      - temp-data:/var/temp_dir
+    command: [ "spark-submit", "--packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.4.3", "/app/spark.py" ]
+
+  kafka-consumer:
+    build:
+      context: ./kafka-consumer
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://admin:admin@kafka-consumer-db:27017/factory?authSource=admin
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+    networks:
+      - factory-network
+    depends_on:
+      - kafka-consumer-db
+      - kafka
+
+networks:
+  factory-network:
+    driver: bridge
+
+volumes:
+  mongo-data:
+  temp-data:

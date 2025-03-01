@@ -1,0 +1,24 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: 'kafka-consumer'
+  data:
+    mongodb:
+      uri: mongodb://admin:admin@kafka-consumer-db:27017/factory?authSource=admin
+  kafka:
+    bootstrap-servers: kafka:29092
+    consumer:
+      group-id: "export-summary-1"
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring:
+          json:
+            trusted:
+              packages: '*'
+
+topic:
+  export-summary: 'export-summary'
