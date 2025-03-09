@@ -41,7 +41,6 @@ public class TaskController {
 
     private Task mapToTask(TaskRequestDto taskRequestDto) {
         Task task = new Task();
-        task.setId(taskRequestDto.getId());
         task.setMachineId(taskRequestDto.getMachineId());
         task.setStatus(taskRequestDto.getStatus());
         task.setDescription(taskRequestDto.getDescription());

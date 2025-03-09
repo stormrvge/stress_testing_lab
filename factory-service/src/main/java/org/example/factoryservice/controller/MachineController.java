@@ -53,7 +53,6 @@ public class MachineController {
 
     private Machine mapToMachine(MachineRequestDto machineRequestDto) {
         Machine machine = new Machine();
-        machine.setId(machineRequestDto.getId());
         machine.setName(machineRequestDto.getName());
         machine.setStatus(machineRequestDto.getStatus());
         machine.setCreatedAt(LocalDateTime.now());
