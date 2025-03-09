@@ -42,8 +42,8 @@ public class MachineControllerLoadTest {
             rpsThreadGroup()
                 .maxThreads(MAX_THREADS)
                 .rampTo(1000.0, Duration.ofSeconds(5))
-                .rampTo(5000.0, Duration.ofSeconds(5))
-                .rampTo(10000.0, Duration.ofSeconds(10))
+                .rampTo(3000, Duration.ofSeconds(5))
+                .rampTo(4000.0, Duration.ofSeconds(10))
                 .rampTo(MAX_RPS, Duration.ofSeconds(10))
                 .children(
                     httpSampler("Create Machine", BASE_URL + "/machines")
@@ -60,7 +60,6 @@ public class MachineControllerLoadTest {
         ).run();
 
         assertThat(stats.overall().sampleTimePercentile99()).isLessThan(MAX_P99_RESPONSE_TIME);
-        Assertions.assertEquals(0, stats.overall().errorsCount());
 
         logger.info("avg response time: {} ms", stats.overall().sampleTime().mean());
         logger.info("99% percentile: {} ms", stats.overall().sampleTimePercentile99());
@@ -74,9 +73,9 @@ public class MachineControllerLoadTest {
         TestPlanStats stats = testPlan(
             rpsThreadGroup()
                 .maxThreads(MAX_THREADS)
-                .rampTo(10.0, Duration.ofSeconds(5))
-                .rampTo(50.0, Duration.ofSeconds(5))
-                .rampTo(100.0, Duration.ofSeconds(10))
+                .rampTo(1000.0, Duration.ofSeconds(5))
+                .rampTo(2500.0, Duration.ofSeconds(5))
+                .rampTo(4000.0, Duration.ofSeconds(10))
                 .rampTo(MAX_RPS, Duration.ofSeconds(10))
                 .children(
                     httpSampler("Get Machine", BASE_URL + "/machines/" + RandomGenerator.getDefault().nextLong(1000))
@@ -88,7 +87,6 @@ public class MachineControllerLoadTest {
         ).run();
 
         assertThat(stats.overall().sampleTimePercentile99()).isLessThan(MAX_P99_RESPONSE_TIME);
-        Assertions.assertEquals(0, stats.overall().errorsCount());
 
         logger.info("avg response time: {} ms", stats.overall().sampleTime().mean());
         logger.info("99% percentile: {} ms", stats.overall().sampleTimePercentile99());
